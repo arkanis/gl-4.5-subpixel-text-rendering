@@ -273,7 +273,7 @@ GLuint gl_load_shader_program(const char* vertex_shader_code, const char* fragme
 // Main program. Only renders one string.
 //
 
-int main() {
+int main(int, char**) {
 	SDL_Init(SDL_INIT_VIDEO);
 	atexit(SDL_Quit);
 	
