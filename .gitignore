@@ -1,0 +1,4 @@
+main
+deps/*.tar.gz
+deps/*.a
+deps/include/SDL

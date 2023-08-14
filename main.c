@@ -555,7 +555,7 @@ int main() {
 						current_x = pos_x;
 						current_y += round(line_height);
 					} else {
-						int horizontal_filter_padding = 1, subpixel_positioning_right_padding = 1;
+						int horizontal_filter_padding = 1, subpixel_positioning_left_padding = 1;
 						
 						// Check if that glyph is already in the glyph atlas
 						assert(codepoint <= 127);
@@ -578,7 +578,7 @@ int main() {
 							
 							// Only render glyphs that actually have some visual representation (skip spaces, etc.)
 							if (glyph_width_px > 0 && glyph_height_px > 0) {
-								int padded_glyph_width_px  = horizontal_filter_padding + glyph_width_px + horizontal_filter_padding + subpixel_positioning_right_padding;
+								int padded_glyph_width_px  = subpixel_positioning_left_padding + horizontal_filter_padding + glyph_width_px + horizontal_filter_padding;
 								int padded_glyph_height_px = glyph_height_px;
 								
 								// Here you would usually ask the glyph atlas to allocate a region with the size of padded_glyph_width_px and padded_glyph_height_px size.
@@ -605,7 +605,7 @@ int main() {
 								int bitmap_size       = bitmap_stride * atlas_item_height;
 								uint8_t* glyph_bitmap = calloc(1, bitmap_size);
 								// Position of the rasterized glyph within the atlas item when padding is taken into account
-								int glyph_offset_x = horizontal_filter_padding * horizontal_resolution;
+								int glyph_offset_x = (subpixel_positioning_left_padding + horizontal_filter_padding) * horizontal_resolution;
 								// Rasterize the glyph into glyph_bitmap
 								stbtt_MakeGlyphBitmap(&font_info,
 									glyph_bitmap + glyph_offset_x,
@@ -625,17 +625,22 @@ int main() {
 								// Just iterate over all the subpixels the filter can reach, no need to filter the entire bitmap when the results would just be 0.
 								uint8_t filter_weights[5] = { 0x08, 0x4D, 0x56, 0x4D, 0x08 };
 								for (int y = 0; y < padded_glyph_height_px; y++) {
-									// We don't need to filter the 1st and last 4 subpixels. The filter kernel is only 5 wide and it can only distribute data
+									// We don't need to filter the first 4 and last 1 subpixels. The filter kernel is only 5 wide and it can only distribute data
 									// at most 2 subpixels in each direction.
-									// The 3 first subpixels are just padding (horizontal_filter_padding) so the 1st subpixel in atlas_item_bitmap can't collect
-									// any data from the first subpixel in glyph_bitmap. Hence we start at 1 instead of 0.
-									// The last 6 subpixels are padding (horizontal_filter_padding and subpixel_positioning_right_padding) and only the 6th and
-									// 5th subpixel (from the right) can collect data from the last pixel in glyph_bitmap. So we skip the last 4 subpixels as well.
-									for (int x = 1; x < padded_glyph_width_px * horizontal_resolution - 4; x++) {
-										// Apply the kernel aka filter taps while reading from glyph_bitmap
-										int sum = 0, filter_weight_index = 0;
-										for (int kernel_x = (x <= 1 ? 0 : x - 2); kernel_x <= x + 2; kernel_x++) {
-											sum += glyph_bitmap[kernel_x + y*bitmap_stride] * filter_weights[filter_weight_index++];
+									// The first 6 subpixels are just padding (subpixel_positioning_left_padding and horizontal_filter_padding) so the first 4
+									// subpixels in atlas_item_bitmap can't collect any data from the first subpixel in glyph_bitmap. Hence we start at 4 instead of 0.
+									// The last subpixel is padding again (horizontal_filter_padding) and only the 3rd and 2nd subpixel from the right can collect
+									// data from the last subpixel of the glyph_bitmap. So we skip the last subpixel as well.
+									int x_end = padded_glyph_width_px * horizontal_resolution - 1;
+									for (int x = 4; x < x_end; x++) {
+										// Apply the kernel aka filter taps while reading from glyph_bitmap. kernel_x_end makes sure we don't read over the end of the bitmap.
+										int sum = 0, filter_weight_index = 0, kernel_x_end = (x == x_end - 1) ? x + 1 : x + 2;
+										for (int kernel_x = x - 2; kernel_x <= kernel_x_end; kernel_x++) {
+											assert(kernel_x >= 0 && kernel_x < x_end + 1);  // There is 1 more subpixel after the last processed one, so we can access that one just fine.
+											assert(y        >= 0 && y        < padded_glyph_height_px);
+											int offset = kernel_x + y*bitmap_stride;
+											assert(offset >= 0 && offset < bitmap_size);
+											sum += glyph_bitmap[offset] * filter_weights[filter_weight_index++];
 										}
 										
 										// Do the division once at the end instead of for each filter weight and make sure we handle overflows.
@@ -684,8 +689,8 @@ int main() {
 							int glyph_height                          = glyph_atlas_item.tex_coords.bottom - glyph_atlas_item.tex_coords.top;
 							
 							rect_buffer[rect_buffer_filled++] = (rect_instance_t){
-								.pos.left   = glyph_pos_x_px - horizontal_filter_padding,
-								.pos.right  = glyph_pos_x_px - horizontal_filter_padding + glyph_width_with_horiz_filter_padding,
+								.pos.left   = glyph_pos_x_px - (subpixel_positioning_left_padding + horizontal_filter_padding),
+								.pos.right  = glyph_pos_x_px - (subpixel_positioning_left_padding + horizontal_filter_padding) + glyph_width_with_horiz_filter_padding,
 								.pos.top    = glyph_pos_y_px,
 								.pos.bottom = glyph_pos_y_px + glyph_height,
 								.subpixel_shift = glyph_pos_x_subpixel_shift,
