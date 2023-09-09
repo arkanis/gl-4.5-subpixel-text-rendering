@@ -17,6 +17,9 @@ Unusual and maybe not "pretty", but spares you from tracking all those indirecti
 ## Building
 
 - The project is meant for Linux and Windows. No idea if it works on Mac or not.
+- On Linux Mint you'll need the packages libx11-dev libxext-dev libopengl-dev to compile the program
+  - `sudo apt install libx11-dev libxext-dev libopengl-dev`
+  - libx11-dev and libxext-dev are for the libSDL X11 driver. If your distribution uses something else you'll need different packages there.
 - On Windows I use the w64devkit-mini release from [skeeto/w64devkit](https://github.com/skeeto/w64devkit). Ist just a ZIP archive with GCC, make, busybox, etc.
 - Clone or download the repo and run `make`.  
   This will automatically download (and on Linux compile) SDL and then the demo itself.
